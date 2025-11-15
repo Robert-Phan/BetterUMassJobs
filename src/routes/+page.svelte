@@ -19,8 +19,10 @@
 	let onCampusFilter = $state('all' as BooleanFilter);
 	let onBusRouteFilter = $state('all' as BooleanFilter);
 	let hiringPeriodFilter = $state('all');
-	let jobTitleFilter = $state('all');
-	let cityFilter = $state('all');
+	let jobTitleSelectValue = $state('all');
+	let selectedJobTitles = $state<string[]>([]);
+	let citySelectValue = $state('all');
+	let selectedCities = $state<string[]>([]);
 	let hoursMinInput = $state<number | null>(null);
 	let hoursMaxInput = $state<number | null>(null);
 	let payMinInput = $state<number | null>(null);
@@ -96,16 +98,17 @@
 			const normalizedTitle = p.title.toLowerCase();
 			const normalizedDescription = p.description.toLowerCase();
 			const combinedText = `${normalizedTitle} ${normalizedDescription}`;
+			const trimmedTitle = p.title.trim();
 			// const hasSearch = searchWords.length > 0;
 			// const titleMatchesSearch = hasSearch
 			// 	? searchWords.every((word) => normalizedTitle.includes(word))
 			// 	: false;
 			// const textMatchesSearch = hasSearch ? searchWords.every((word) => combinedText.includes(word)) : true;
-			// const matchesTitleFilter = jobTitleFilter === 'all' || p.title === jobTitleFilter;
-
-			// if (jobTitleFilter !== 'all' && !matchesTitleFilter && !titleMatchesSearch) return false;
-			if (jobTitleFilter !== 'all' && p.title !== jobTitleFilter) return false;
-			if (cityFilter !== 'all' && (p.city ?? '') !== cityFilter) return false;
+			if (selectedJobTitles.length && !selectedJobTitles.includes(trimmedTitle)) return false;
+			if (selectedCities.length) {
+				const postingCity = (p.city ?? '').trim();
+				if (!selectedCities.includes(postingCity)) return false;
+			}
 
 			if (normalizedHoursRange.min !== null || normalizedHoursRange.max !== null) {
 				const [jobMin, jobMax] = getHoursRange(p.hoursPerWeek);
@@ -183,6 +186,58 @@
 		const parts = [p.streetAddress, [p.city, p.state].filter(Boolean).join(', ')].filter(Boolean);
 		return parts.length ? parts.join(' · ') : null;
 	}
+
+	function addJobTitleSelection(title: string) {
+		const trimmed = title.trim();
+		if (!trimmed) return;
+		if (!selectedJobTitles.includes(trimmed)) {
+			selectedJobTitles = [...selectedJobTitles, trimmed];
+		}
+	}
+
+	function removeJobTitleSelection(title: string) {
+		selectedJobTitles = selectedJobTitles.filter((t) => t !== title);
+	}
+
+	function handleJobTitleSelect(event: Event) {
+		const target = event.target as HTMLSelectElement;
+		const value = target.value;
+
+		if (value === 'all') {
+			selectedJobTitles = [];
+			jobTitleSelectValue = 'all';
+			return;
+		}
+
+		addJobTitleSelection(value);
+		jobTitleSelectValue = 'all';
+	}
+
+	function addCitySelection(city: string) {
+		const trimmed = city.trim();
+		if (!trimmed) return;
+		if (!selectedCities.includes(trimmed)) {
+			selectedCities = [...selectedCities, trimmed];
+		}
+	}
+
+	function removeCitySelection(city: string) {
+		selectedCities = selectedCities.filter((c) => c !== city);
+	}
+
+	function handleCitySelect(event: Event) {
+		const target = event.target as HTMLSelectElement;
+		const value = target.value;
+
+		if (value === 'all') {
+			selectedCities = [];
+			citySelectValue = 'all';
+			return;
+		}
+
+		addCitySelection(value);
+		citySelectValue = 'all';
+	}
 </script>
 
 {#await jobPostingsPromise}
@@ -226,7 +281,7 @@
 			<label for="hiring-period-filter">Hiring Period</label>
 			<select id="hiring-period-filter" bind:value={hiringPeriodFilter}>
 				<option value="all">All periods</option>
-				{#each hiringPeriodOptions as option}
+				{#each hiringPeriodOptions as option (option)}
 					<option value={option}>{option}</option>
 				{/each}
 			</select>
@@ -234,9 +289,9 @@
 
 		<div class="filter">
 			<label for="title-filter">Job Title</label>
-			<select id="title-filter" bind:value={jobTitleFilter}>
+			<select id="title-filter" bind:value={jobTitleSelectValue} onchange={handleJobTitleSelect}>
 				<option value="all">All titles</option>
-				{#each jobTitleOptions as option}
+				{#each jobTitleOptions as option (option)}
 					<option value={option}>{option}</option>
 				{/each}
 			</select>
@@ -244,9 +299,9 @@
 
 		<div class="filter">
 			<label for="city-filter">City</label>
-			<select id="city-filter" bind:value={cityFilter}>
+			<select id="city-filter" bind:value={citySelectValue} onchange={handleCitySelect}>
 				<option value="all">All cities</option>
-				{#each cityOptions as option}
+				{#each cityOptions as option (option)}
 					<option value={option}>{option}</option>
 				{/each}
 			</select>
@@ -316,6 +371,53 @@
 			</div>
 		</div>
 	</div>
+	{#if selectedJobTitles.length || selectedCities.length}
+		<div class="selected-filter-tags">
+			{#if selectedJobTitles.length}
+				<div class="tag-group">
+					<span class="tags-label">Job Titles:</span>
+					<div class="tags-list">
+						{#each selectedJobTitles as title (title)}
+							<span class="tag">
+								<span>{title}</span>
+								<button
+									type="button"
+									class="tag-remove"
+									aria-label={`Remove ${title} job title filter`}
+									onclick={() => removeJobTitleSelection(title)}
+								>
+									×
+								</button>
+							</span>
+						{/each}
+					</div>
+				</div>
+			{/if}
+			{#if selectedJobTitles.length && selectedCities.length}
+				<span class="tags-separator" aria-hidden="true">|</span>
+			{/if}
+			{#if selectedCities.length}
+				<div class="tag-group">
+					<span class="tags-label">Cities:</span>
+					<div class="tags-list">
+						{#each selectedCities as city (city)}
+							<span class="tag">
+								<span>{city}</span>
+								<button
+									type="button"
+									class="tag-remove"
+									aria-label={`Remove ${city} city filter`}
+									onclick={() => removeCitySelection(city)}
+								>
+									×
+								</button>
+							</span>
+						{/each}
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
 	<div class="results-meta">
 		<button class="expand-all-btn" type="button" onclick={toggleExpandAll} disabled={!filteredIds.length}>
 			{allExpanded ? 'Collapse all' : 'Expand all'}
@@ -488,6 +590,67 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 		gap: 1rem;
+	}
+
+	.selected-filter-tags {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		gap: 0.75rem;
+		margin-top: 1rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.tag-group {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.tags-label {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--muted);
+	}
+
+	.tags-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.tags-separator {
+		align-self: center;
+		color: var(--border);
+		font-weight: 600;
+	}
+
+	.tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		background: var(--accent-weak);
+		border-radius: 999px;
+		border: 1px solid rgba(15, 118, 110, 0.25);
+		padding: 0.35rem 0.6rem;
+		font-size: 0.85rem;
+		color: var(--text);
+	}
+
+	.tag-remove {
+		border: none;
+		background: transparent;
+		color: var(--accent);
+		font-size: 0.85rem;
+		line-height: 1;
+		cursor: pointer;
+		padding: 0;
+	}
+	.tag-remove:hover,
+	.tag-remove:focus-visible {
+		color: #0c4a3e;
 	}
 
 	.filter {

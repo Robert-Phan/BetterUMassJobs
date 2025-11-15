@@ -64,6 +64,16 @@ type PostingDetails = {
     departmentInfo?: string
 }
 
+function normalizeCity(value: string) {
+    let normalized = value
+    normalized = normalized.replace(/\s+MA$/i, '')
+    normalized = normalized.replace(/[^\w ]/g, '')
+    normalized = normalized.replace(/\s+/g, ' ')
+    normalized = normalized.toLowerCase()
+    normalized = normalized.replace(/\b\w/g, char => char.toUpperCase())
+    return normalized.trim()
+}
+
 export function processDetails(doc: Document): PostingDetails {
     const paragraphs = Array.from(doc.querySelectorAll('p'));
 
@@ -88,8 +98,9 @@ export function processDetails(doc: Document): PostingDetails {
     const streetAddressTxt = getParaText(paragraphs[13])
     const streetAddress = streetAddressTxt !== "No address provided" ? streetAddressTxt : undefined
 
-    const cityTxt = getParaText(paragraphs[14])
-    const city = cityTxt !== "No city provided" ? cityTxt : undefined
+    const rawCityTxt = getParaText(paragraphs[14])
+    const cityTxt = normalizeCity(rawCityTxt)
+    const city = rawCityTxt !== "No city provided" ? cityTxt : undefined
 
     const state = getParaText(paragraphs[15])
 
