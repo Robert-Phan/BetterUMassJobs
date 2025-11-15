@@ -1,6 +1,24 @@
 import { get } from 'svelte/store'
 import { type TableRecord } from './processTable'
 
+function decodeCloudflareEmail(encoded: string) {
+    if (encoded.length < 2)
+        return ''
+
+    const key = parseInt(encoded.slice(0, 2), 16)
+    if (Number.isNaN(key))
+        return ''
+
+    let email = ''
+    for (let i = 2; i < encoded.length; i += 2) {
+        const charCode = parseInt(encoded.slice(i, i + 2), 16)
+        if (Number.isNaN(charCode))
+            continue
+        email += String.fromCharCode(charCode ^ key)
+    }
+    return email
+}
+
 function getParaText(p: HTMLParagraphElement) {
     let res = Array.from(p.childNodes)
         .map(node => {
@@ -12,8 +30,14 @@ function getParaText(p: HTMLParagraphElement) {
                 if (el.tagName === 'BR')
                     return '\n';
 
-                if (el.tagName === 'A')
+                if (el.tagName === 'A') {
+                    const cloudflareEl = (el.matches('[data-cfemail]') ? el : el.querySelector('[data-cfemail]')) as HTMLElement | null
+                    const encoded = cloudflareEl?.getAttribute('data-cfemail') ?? undefined
+                    if (encoded)
+                        return ' ' + decodeCloudflareEmail(encoded)
+
                     return ' ' + el.innerText
+                }
             }
 
             return ''; // ignore other elements
