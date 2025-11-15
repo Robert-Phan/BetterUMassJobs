@@ -7,6 +7,7 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	<title>Better UMass Job Board</title>
 </svelte:head>
 
 {@render children()}
