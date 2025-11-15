@@ -15,6 +15,11 @@ const config = {
 		paths: {
 			base: dev ? '' : '/BetterUMassJobs'
 		}
+	},
+	compilerOptions: {
+		experimental: {
+			async: true
+		}
 	}
 };
 

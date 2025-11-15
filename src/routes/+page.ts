@@ -68,6 +68,6 @@ export const load: PageLoad = async ({ fetch }) => {
 	const jobPostings = await loadJobPostings(fetch);
 
 	return {
-		jobPostings
+		jobPostings: loadJobPostings(fetch)
 	};
 };

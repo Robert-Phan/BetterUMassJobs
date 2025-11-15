@@ -5,7 +5,12 @@
 	import type { JobPosting } from './processDetails';
 
 	let { data }: PageProps = $props();
-	const jobPostings = data.jobPostings;
+	const jobPostingsPromise: Promise<JobPosting[]> = data.jobPostings;
+	let jobPostings = $state([] as JobPosting[]);
+
+	jobPostingsPromise.then((value) => {
+		jobPostings = value;
+	});
 
 	type WorkStudyFilter = 'all' | 'yes' | 'no' | 'either';
 	type BooleanFilter = 'all' | 'yes' | 'no';
@@ -16,21 +21,24 @@
 	let hiringPeriodFilter = $state('all');
 	let jobTitleFilter = $state('all');
 	let cityFilter = $state('all');
-	let hoursMinInput = $state('');
-	let hoursMaxInput = $state('');
-	let payMinInput = $state('');
-	let payMaxInput = $state('');
+	let hoursMinInput = $state<number | null>(null);
+	let hoursMaxInput = $state<number | null>(null);
+	let payMinInput = $state<number | null>(null);
+	let payMaxInput = $state<number | null>(null);
 	let descriptionSearch = $state('');
 
 	function uniqueSorted(values: Array<string | null | undefined>): string[] {
-		const unique = new Set<string>();
+		const seen: Record<string, true> = {};
+		const unique: string[] = [];
 		for (const value of values) {
 			if (!value) continue;
 			const trimmed = value.trim();
 			if (!trimmed) continue;
-			unique.add(trimmed);
+			if (seen[trimmed]) continue;
+			seen[trimmed] = true;
+			unique.push(trimmed);
 		}
-		return Array.from(unique).sort((a, b) => a.localeCompare(b));
+		return unique.sort((a, b) => a.localeCompare(b));
 	}
 
 	function getHoursRange(hours: HoursPerWeek): [number, number] {
@@ -41,15 +49,14 @@
 		return [hours, hours];
 	}
 
-	function parseNumber(value: string): number | null {
-		if (!value.trim()) return null;
-		const parsed = Number(value);
-		return Number.isFinite(parsed) ? parsed : null;
+	function normalizeNumber(value: number | null): number | null {
+		if (value === null) return null;
+		return Number.isFinite(value) ? value : null;
 	}
 
-	function getNormalizedRange(minInput: string, maxInput: string) {
-		const minValue = parseNumber(minInput);
-		const maxValue = parseNumber(maxInput);
+	function getNormalizedRange(minInput: number | null, maxInput: number | null) {
+		const minValue = normalizeNumber(minInput);
+		const maxValue = normalizeNumber(maxInput);
 
 		if (minValue !== null && maxValue !== null && minValue > maxValue) {
 			return { min: maxValue, max: minValue };
@@ -89,14 +96,15 @@
 			const normalizedTitle = p.title.toLowerCase();
 			const normalizedDescription = p.description.toLowerCase();
 			const combinedText = `${normalizedTitle} ${normalizedDescription}`;
-			const hasSearch = searchWords.length > 0;
-			const titleMatchesSearch = hasSearch
-				? searchWords.every((word) => normalizedTitle.includes(word))
-				: false;
-			const textMatchesSearch = hasSearch ? searchWords.every((word) => combinedText.includes(word)) : true;
-			const matchesTitleFilter = jobTitleFilter === 'all' || p.title === jobTitleFilter;
+			// const hasSearch = searchWords.length > 0;
+			// const titleMatchesSearch = hasSearch
+			// 	? searchWords.every((word) => normalizedTitle.includes(word))
+			// 	: false;
+			// const textMatchesSearch = hasSearch ? searchWords.every((word) => combinedText.includes(word)) : true;
+			// const matchesTitleFilter = jobTitleFilter === 'all' || p.title === jobTitleFilter;
 
-			if (jobTitleFilter !== 'all' && !matchesTitleFilter && !titleMatchesSearch) return false;
+			// if (jobTitleFilter !== 'all' && !matchesTitleFilter && !titleMatchesSearch) return false;
+			if (jobTitleFilter !== 'all' && p.title !== jobTitleFilter) return false;
 			if (cityFilter !== 'all' && (p.city ?? '') !== cityFilter) return false;
 
 			if (normalizedHoursRange.min !== null || normalizedHoursRange.max !== null) {
@@ -115,19 +123,7 @@
 				return false;
 			}
 
-			const hasSpecificTitleFilter = jobTitleFilter !== 'all';
-
-			if (hasSpecificTitleFilter && !matchesTitleFilter && !titleMatchesSearch) {
-				return false;
-			}
-
-			if (!textMatchesSearch) {
-				if (hasSpecificTitleFilter && matchesTitleFilter) {
-					// keep dropdown matches even when search doesn't match
-				} else {
-					return false;
-				}
-			}
+			if (searchWords.length && !searchWords.every((word) => combinedText.includes(word))) return false;
 
 			return true;
 		})
@@ -142,9 +138,13 @@
 		if (allExpanded) {
 			open = open.filter((id) => !filteredIds.includes(id));
 		} else {
-			const merged = new Set(open);
-			for (const id of filteredIds) merged.add(id);
-			open = Array.from(merged);
+			const merged = [...open];
+			for (const id of filteredIds) {
+				if (!merged.includes(id)) {
+					merged.push(id);
+				}
+			}
+			open = merged;
 		}
 	}
 
@@ -185,6 +185,12 @@
 	}
 </script>
 
+{#await jobPostingsPromise}
+	<div class="loading-state" role="status" aria-live="polite">
+		<span class="spinner" aria-hidden="true"></span>
+		<span>Loading job data…</span>
+	</div>
+{:then}
 <section class="filters-panel">
 	<h2>Search & Filter</h2>
 	<div class="filters-grid">
@@ -321,6 +327,7 @@
 	</div>
 </section>
 
+
 <table class="jobs">
 	<thead>
 		<tr class="column">
@@ -438,6 +445,7 @@
 		{/if}
 	</tbody>
 </table>
+{/await}
 
 <style>
 	:root {
@@ -570,6 +578,34 @@
 	.expand-all-btn:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	.loading-state {
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+		justify-content: center;
+		margin: 3rem 0;
+		font-size: 1.1rem;
+		color: var(--muted);
+	}
+
+	.spinner {
+		width: 1.5rem;
+		height: 1.5rem;
+		border-radius: 50%;
+		border: 3px solid var(--border);
+		border-top-color: var(--accent);
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from {
+			transform: rotate(0turn);
+		}
+		to {
+			transform: rotate(1turn);
+		}
 	}
 
 	table.jobs {
