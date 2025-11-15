@@ -65,9 +65,9 @@ const loadJobPostings = async (fetchFn: typeof fetch) => {
 export const ssr = false;
 
 export const load: PageLoad = async ({ fetch }) => {
-	const jobPostings = await loadJobPostings(fetch);
+	const jobPostingsPromise =  loadJobPostings(fetch);
 
 	return {
-		jobPostings: loadJobPostings(fetch)
+		jobPostingsPromise
 	};
 };

@@ -5,7 +5,7 @@
 	import type { JobPosting } from './processDetails';
 
 	let { data }: PageProps = $props();
-	const jobPostingsPromise: Promise<JobPosting[]> = data.jobPostings;
+	const jobPostingsPromise: Promise<JobPosting[]> = data.jobPostingsPromise;
 	let jobPostings = $state([] as JobPosting[]);
 
 	jobPostingsPromise.then((value) => {
